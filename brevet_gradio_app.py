@@ -43,12 +43,24 @@ def process_pdf(pdf_file):
     img = images[0]
     counts = count_colors(img, color_refs)
     if sum(counts.values()) == 0:
-        return "Erreur : aucune couleur détectée", ""
+        return 0
     dominant = max(counts.items(), key=lambda x: x[1])[0]
-    score = color_score_map[dominant]
-    total_score = int(score * len(competences))
-    note_sur_20 = round((total_score / 400) * 20, 2)
-    return f"{total_score} / 400", f"{note_sur_20} / 20"
+    return color_score_map[dominant]
+
+def dual_pdf_upload(pdf1, pdf2):
+    score1 = process_pdf(pdf1) if pdf1 else 0
+    score2 = process_pdf(pdf2) if pdf2 else 0
+    if pdf1 and pdf2:
+        avg = (score1 + score2) / 2
+    elif pdf1:
+        avg = score1
+    elif pdf2:
+        avg = score2
+    else:
+        return "Aucun PDF fourni", ""
+    total = int(avg * len(competences))
+    note = round((total / 400) * 20, 2)
+    return f"{total} / 400", f"{note} / 20"
 
 niveau_choices = ["Très bonne maîtrise", "Maîtrise satisfaisante", "Maîtrise fragile", "Maîtrise insuffisante"]
 
@@ -74,11 +86,13 @@ with gr.Blocks() as demo:
     gr.Markdown("## 🎓 Calcul du Contrôle Continu du Brevet")
 
     with gr.Tab("📄 Analyse PDF"):
-        pdf_input = gr.File(label="Téléverser un PDF")
+        with gr.Row():
+            pdf_input_1 = gr.File(label="📘 PDF Semestre 1", file_types=[".pdf"])
+            pdf_input_2 = gr.File(label="📗 PDF Semestre 2", file_types=[".pdf"])
         score400_pdf = gr.Textbox(label="Points (PDF)")
         score20_pdf = gr.Textbox(label="Note sur 20 (PDF)")
-        pdf_btn = gr.Button("Analyser PDF")
-        pdf_btn.click(fn=process_pdf, inputs=pdf_input, outputs=[score400_pdf, score20_pdf])
+        pdf_btn = gr.Button("Analyser")
+        pdf_btn.click(fn=dual_pdf_upload, inputs=[pdf_input_1, pdf_input_2], outputs=[score400_pdf, score20_pdf])
 
     with gr.Tab("✍️ Entrée manuelle"):
         gr.Markdown("### Choisissez le niveau pour chaque compétence (Semestre 1 et 2)")
