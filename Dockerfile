@@ -11,7 +11,7 @@ WORKDIR /app
 COPY . /app
 
 RUN pip install --upgrade pip
-RUN pip install gradio pdf2image pillow numpy
+RUN pip install gradio pdf2image pillow numpy pymupdf
 
 EXPOSE 7860
 CMD ["python", "brevet_gradio_app.py"]
