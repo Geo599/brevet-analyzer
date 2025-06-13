@@ -81,12 +81,19 @@ with gr.Blocks() as demo:
         pdf_btn.click(fn=process_pdf, inputs=pdf_input, outputs=[score400_pdf, score20_pdf])
 
     with gr.Tab("✍️ Entrée manuelle"):
-        sem1_inputs = [gr.Dropdown(niveau_choices, label=f"{comp} - Semestre 1") for comp in competences]
-        sem2_inputs = [gr.Dropdown(niveau_choices, label=f"{comp} - Semestre 2") for comp in competences]
+        gr.Markdown("### Choisissez le niveau pour chaque compétence (Semestre 1 et 2)")
+        sem1_inputs, sem2_inputs = [], []
+
+        for comp in competences:
+            with gr.Row():
+                s1 = gr.Dropdown(niveau_choices, label=f"{comp} - S1", scale=1)
+                s2 = gr.Dropdown(niveau_choices, label=f"{comp} - S2", scale=1)
+                sem1_inputs.append(s1)
+                sem2_inputs.append(s2)
+
         score400_manual = gr.Textbox(label="Points (manuel)")
         score20_manual = gr.Textbox(label="Note sur 20 (manuel)")
         calc_btn = gr.Button("Calculer")
         calc_btn.click(fn=calculer_manuel, inputs=[*sem1_inputs, *sem2_inputs], outputs=[score400_manual, score20_manual])
 
 demo.launch(server_name="0.0.0.0", server_port=7860)
-
