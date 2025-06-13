@@ -1,7 +1,6 @@
 
 import gradio as gr
-from pdf2image import convert_from_bytes
-from PIL import Image
+import fitz  # PyMuPDF
 import numpy as np
 
 competences = [
@@ -15,54 +14,36 @@ competences = [
     "Représentation du monde"
 ]
 
-color_score_map = {
-    "Très bonne maîtrise (dark green)": 50,
-    "Maîtrise satisfaisante (light green)": 40,
-    "Maîtrise fragile (yellow)": 25,
-    "Maîtrise insuffisante (orange)": 10
+symbol_map = {
+    "🟢➕": 50,  # Très bonne maîtrise
+    "🟢": 40,   # Maîtrise satisfaisante
+    "🟡": 25,   # Maîtrise fragile
+    "🟠": 10    # Maîtrise insuffisante
 }
 
-color_refs = {
-    "Très bonne maîtrise (dark green)": (0, 100, 0),
-    "Maîtrise satisfaisante (light green)": (144, 238, 144),
-    "Maîtrise fragile (yellow)": (255, 255, 0),
-    "Maîtrise insuffisante (orange)": (245, 130, 32)
-}
-
-def count_colors(img, color_defs, tolerance=80):
-    img_np = np.array(img)
-    counts = {}
-    for label, rgb_ref in color_defs.items():
-        dist = np.sqrt(np.sum((img_np - rgb_ref) ** 2, axis=2))
-        match_pixels = dist < tolerance
-        counts[label] = int(np.sum(match_pixels))
-    return counts
-
-def process_pdf(pdf_file):
+def process_pdf_symbols(pdf_file):
     try:
-        content = pdf_file.read()
-        if not content:
-            return 0
-        images = convert_from_bytes(content, dpi=300)
-        img = images[0]
-        counts = count_colors(img, color_refs)
-        if sum(counts.values()) == 0:
-            return 0
-        dominant = max(counts.items(), key=lambda x: x[1])[0]
-        return color_score_map[dominant]
-    except Exception as e:
-        print("Erreur PDF:", e)
-        return 0
+        with fitz.open(stream=pdf_file.read(), filetype="pdf") as doc:
+            text = ""
+            for page in doc:
+                text += page.get_text()
 
-def dual_pdf_upload(pdf1, pdf2):
-    score1 = process_pdf(pdf1) if pdf1 else 0
-    score2 = process_pdf(pdf2) if pdf2 else 0
-    if score1 == 0 and score2 == 0:
-        return "Aucune couleur détectée", ""
-    avg = (score1 + score2) / 2 if pdf1 and pdf2 else score1 if pdf1 else score2
-    total = int(avg * len(competences))
-    note = round((total / 400) * 20, 2)
-    return f"{total} / 400", f"{note} / 20"
+        symbol_counts = {k: text.count(k) for k in symbol_map}
+        total_symbols = sum(symbol_counts.values())
+
+        if total_symbols == 0:
+            return "Aucun symbole détecté", ""
+
+        dominant = max(symbol_counts.items(), key=lambda x: x[1])[0]
+        score = symbol_map[dominant]
+        total_score = int(score * len(competences))
+        note_sur_20 = round((total_score / 400) * 20, 2)
+
+        return f"{total_score} / 400", f"{note_sur_20} / 20"
+
+    except Exception as e:
+        print("Erreur lors de la lecture du PDF:", e)
+        return "Erreur PDF", ""
 
 niveau_choices = ["Très bonne maîtrise", "Maîtrise satisfaisante", "Maîtrise fragile", "Maîtrise insuffisante"]
 
@@ -85,16 +66,14 @@ def calculer_manuel(*args):
     return f"{int(total)} / 400", f"{note_sur_20} / 20"
 
 with gr.Blocks() as demo:
-    gr.Markdown("## 🎓 Calcul du Contrôle Continu du Brevet")
+    gr.Markdown("## 🎓 Calcul du Contrôle Continu du Brevet (Détection par symbole)")
 
     with gr.Tab("📄 Analyse PDF"):
-        with gr.Row():
-            pdf_input_1 = gr.File(label="📘 PDF Semestre 1", file_types=[".pdf"])
-            pdf_input_2 = gr.File(label="📗 PDF Semestre 2", file_types=[".pdf"])
+        pdf_input = gr.File(label="Téléverser un PDF contenant les symboles 🟢➕ 🟢 🟡 🟠", file_types=[".pdf"])
         score400_pdf = gr.Textbox(label="Points (PDF)")
         score20_pdf = gr.Textbox(label="Note sur 20 (PDF)")
-        pdf_btn = gr.Button("Analyser")
-        pdf_btn.click(fn=dual_pdf_upload, inputs=[pdf_input_1, pdf_input_2], outputs=[score400_pdf, score20_pdf])
+        pdf_btn = gr.Button("Analyser le PDF")
+        pdf_btn.click(fn=process_pdf_symbols, inputs=pdf_input, outputs=[score400_pdf, score20_pdf])
 
     with gr.Tab("✍️ Entrée manuelle"):
         gr.Markdown("### Choisissez le niveau pour chaque compétence (Semestre 1 et 2)")
