@@ -39,25 +39,27 @@ def count_colors(img, color_defs, tolerance=80):
     return counts
 
 def process_pdf(pdf_file):
-    images = convert_from_bytes(pdf_file.read(), dpi=300)
-    img = images[0]
-    counts = count_colors(img, color_refs)
-    if sum(counts.values()) == 0:
+    try:
+        content = pdf_file.read()
+        if not content:
+            return 0
+        images = convert_from_bytes(content, dpi=300)
+        img = images[0]
+        counts = count_colors(img, color_refs)
+        if sum(counts.values()) == 0:
+            return 0
+        dominant = max(counts.items(), key=lambda x: x[1])[0]
+        return color_score_map[dominant]
+    except Exception as e:
+        print("Erreur PDF:", e)
         return 0
-    dominant = max(counts.items(), key=lambda x: x[1])[0]
-    return color_score_map[dominant]
 
 def dual_pdf_upload(pdf1, pdf2):
     score1 = process_pdf(pdf1) if pdf1 else 0
     score2 = process_pdf(pdf2) if pdf2 else 0
-    if pdf1 and pdf2:
-        avg = (score1 + score2) / 2
-    elif pdf1:
-        avg = score1
-    elif pdf2:
-        avg = score2
-    else:
-        return "Aucun PDF fourni", ""
+    if score1 == 0 and score2 == 0:
+        return "Aucune couleur détectée", ""
+    avg = (score1 + score2) / 2 if pdf1 and pdf2 else score1 if pdf1 else score2
     total = int(avg * len(competences))
     note = round((total / 400) * 20, 2)
     return f"{total} / 400", f"{note} / 20"
